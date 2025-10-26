@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Loop Chopper</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(to bottom right, #581c87, #3730a3, #1e3a8a);
+            padding: 2rem;
+        }
+        .container { max-width: 56rem; margin: 0 auto; }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
+        .header svg { width: 2.5rem; height: 2.5rem; color: #d8b4fe; }
+        h1 { font-size: 2.25rem; font-weight: bold; color: white; }
+        .subtitle { color: #e9d5ff; margin-bottom: 2rem; line-height: 1.6; }
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 1.5rem;
+        }
+        .label { display: block; color: white; font-weight: 600; margin-bottom: 0.75rem; }
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            color: white;
+            cursor: pointer;
+        }
+        input[type="file"]::file-selector-button {
+            margin-right: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 0;
+            background: #9333ea;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        input[type="file"]::file-selector-button:hover { background: #7e22ce; }
+        .file-name { margin-top: 0.5rem; color: #d8b4fe; }
+        .button-group { display: flex; gap: 0.75rem; }
+        .btn {
+            flex: 1;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+            font-size: 1rem;
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e9d5ff;
+        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.2); }
+        .btn-primary {
+            background: #9333ea;
+            color: white;
+        }
+        .btn-analyze {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            font-size: 1.125rem;
+            background: linear-gradient(to right, #9333ea, #4f46e5);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .btn-analyze:hover { background: linear-gradient(to right, #7e22ce, #4338ca); }
+        .btn-analyze:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .status-box {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+        .status-text { color: #bfdbfe; }
+        .detection-info { color: #dbeafe; font-weight: 600; margin-top: 0.25rem; }
+        .loops-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .loops-title { font-size: 1.5rem; font-weight: bold; color: white; margin-bottom: 1rem; }
+        .loops-list { max-height: 24rem; overflow-y: auto; }
+        .loop-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            transition: background 0.2s;
+        }
+        .loop-item:hover { background: rgba(255, 255, 255, 0.15); }
+        .loop-info { display: flex; align-items: center; gap: 0.75rem; }
+        .checkmark {
+            background: #22c55e;
+            border-radius: 9999px;
+            padding: 0.25rem;
+            display: none;
+        }
+        .checkmark.visible { display: block; }
+        .checkmark svg { width: 1rem; height: 1rem; color: white; }
+        .loop-name { color: white; font-weight: 600; }
+        .loop-details { color: #d8b4fe; font-size: 0.875rem; }
+        .btn-download {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+        .btn-download.purple {
+            background: #9333ea;
+            color: white;
+        }
+        .btn-download.purple:hover { background: #7e22ce; }
+        .btn-download.green {
+            background: #16a34a;
+            color: white;
+        }
+        .btn-download.green:hover { background: #15803d; }
+        .btn-download svg { width: 1rem; height: 1rem; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                </svg>
+                <h1>Audio Loop Chopper</h1>
+            </div>
+            
+            <p class="subtitle">
+                Upload an audio file to detect BPM and musical key, automatically chop it into loops, and download them with organized names.
+            </p>
+
+            <div class="section">
+                <label class="label">Upload Audio File</label>
+                <input type="file" id="audioInput" accept="audio/*">
+                <p id="fileName" class="file-name hidden"></p>
+            </div>
+
+            <div class="section">
+                <label class="label">Loop Size (Bars)</label>
+                <div class="button-group">
+                    <button onclick="setLoopSize(2)" class="btn btn-secondary" id="btn2">2 Bars</button>
+                    <button onclick="setLoopSize(4)" class="btn btn-primary" id="btn4">4 Bars</button>
+                    <button onclick="setLoopSize(8)" class="btn btn-secondary" id="btn8">8 Bars</button>
+                </div>
+            </div>
+
+            <button onclick="chopAudio()" id="analyzeBtn" disabled class="btn-analyze">
+                Analyze & Chop Audio
+            </button>
+
+            <div id="statusBox" class="status-box hidden" style="margin-top: 1.5rem;">
+                <p id="statusText" class="status-text"></p>
+                <p id="detectionInfo" class="detection-info hidden"></p>
+            </div>
+
+            <div id="loopsContainer" class="loops-container hidden" style="margin-top: 1.5rem;">
+                <h2 id="loopsTitle" class="loops-title">Generated Loops (0)</h2>
+                <div id="loopsList" class="loops-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioFile = null;
+        let fileName = '';
+        let audioBuffer = null;
+        let selectedLoopSize = 4;
+        let loops = [];
+        let downloadedLoops = new Set();
+        let bpm = null;
+        let detectedKey = null;
+
+        document.getElementById('audioInput').addEventListener('change', function(e) {
+            audioFile = e.target.files[0];
+            if (!audioFile) return;
+            
+            fileName = audioFile.name.replace(/\.[^.]+$/, '');
+            document.getElementById('fileName').textContent = 'Loaded: ' + fileName;
+            document.getElementById('fileName').classList.remove('hidden');
+            document.getElementById('analyzeBtn').disabled = false;
+            setStatus('Audio file loaded. Click "Analyze & Chop" to process.');
+            loops = [];
+            downloadedLoops = new Set();
+            bpm = null;
+            detectedKey = null;
+            document.getElementById('loopsContainer').classList.add('hidden');
+        });
+
+        function setLoopSize(size) {
+            selectedLoopSize = size;
+            document.getElementById('btn2').className = 'btn ' + (size === 2 ? 'btn-primary' : 'btn-secondary');
+            document.getElementById('btn4').className = 'btn ' + (size === 4 ? 'btn-primary' : 'btn-secondary');
+            document.getElementById('btn8').className = 'btn ' + (size === 8 ? 'btn-primary' : 'btn-secondary');
+        }
+
+        function setStatus(text, showDetection = false) {
+            document.getElementById('statusText').textContent = text;
+            document.getElementById('statusBox').classList.remove('hidden');
+            if (showDetection && bpm && detectedKey) {
+                document.getElementById('detectionInfo').textContent = `Detected - BPM: ${bpm} | Key: ${detectedKey}`;
+                document.getElementById('detectionInfo').classList.remove('hidden');
+            } else {
+                document.getElementById('detectionInfo').classList.add('hidden');
+            }
+        }
+
+        function detectKey(buffer) {
+            const audioData = buffer.getChannelData(0);
+            const sampleRate = buffer.sampleRate;
+            const analysisDuration = Math.min(30, buffer.duration);
+            const analysisLength = Math.floor(analysisDuration * sampleRate);
+            const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const noteEnergy = new Array(12).fill(0);
+            const fftSize = 4096;
+            const hopSize = 2048;
+            
+            for (let i = 0; i < analysisLength - fftSize; i += hopSize) {
+                const slice = audioData.slice(i, i + fftSize);
+                for (let note = 0; note < 12; note++) {
+                    let energy = 0;
+                    const baseFreq = 440 * Math.pow(2, (note - 9) / 12);
+                    for (let octave = 2; octave <= 6; octave++) {
+                        const freq = baseFreq * Math.pow(2, octave - 4);
+                        const period = sampleRate / freq;
+                        for (let j = 0; j < fftSize - period; j++) {
+                            energy += slice[j] * slice[Math.floor(j + period)];
+                        }
+                    }
+                    noteEnergy[note] += Math.abs(energy);
+                }
+            }
+            
+            let maxEnergy = 0;
+            let keyNote = 0;
+            for (let i = 0; i < 12; i++) {
+                if (noteEnergy[i] > maxEnergy) {
+                    maxEnergy = noteEnergy[i];
+                    keyNote = i;
+                }
+            }
+            
+            const majorThird = (keyNote + 4) % 12;
+            const minorThird = (keyNote + 3) % 12;
+            const isMajor = noteEnergy[majorThird] > noteEnergy[minorThird];
+            const scale = isMajor ? 'maj' : 'min';
+            return notes[keyNote] + scale;
+        }
+
+        async function detectBPM(buffer) {
+            const audioData = buffer.getChannelData(0);
+            const sampleRate = buffer.sampleRate;
+            const frameSize = 512;
+            const hopSize = 256;
+            const onsets = [];
+            
+            for (let i = 0; i < audioData.length - frameSize; i += hopSize) {
+                let energy = 0;
+                for (let j = 0; j < frameSize; j++) {
+                    energy += Math.abs(audioData[i + j]);
+                }
+                onsets.push(energy);
+            }
+            
+            const threshold = onsets.reduce((a, b) => a + b) / onsets.length * 1.5;
+            const peaks = [];
+            for (let i = 1; i < onsets.length - 1; i++) {
+                if (onsets[i] > threshold && onsets[i] > onsets[i - 1] && onsets[i] > onsets[i + 1]) {
+                    peaks.push(i * hopSize / sampleRate);
+                }
+            }
+            
+            if (peaks.length < 2) return 120;
+            
+            const intervals = [];
+            for (let i = 1; i < Math.min(peaks.length, 50); i++) {
+                intervals.push(peaks[i] - peaks[i - 1]);
+            }
+            
+            const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+            const estimatedBPM = Math.round(60 / avgInterval);
+            let adjustedBPM = estimatedBPM;
+            while (adjustedBPM < 80) adjustedBPM *= 2;
+            while (adjustedBPM > 180) adjustedBPM /= 2;
+            return Math.round(adjustedBPM);
+        }
+
+        async function chopAudio() {
+            if (!audioFile) return;
+            
+            document.getElementById('analyzeBtn').textContent = 'Analyzing...';
+            document.getElementById('analyzeBtn').disabled = true;
+            setStatus('Analyzing audio and detecting BPM...');
+
+            try {
+                await Tone.start();
+                const arrayBuffer = await audioFile.arrayBuffer();
+                audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
+                
+                bpm = await detectBPM(audioBuffer);
+                setStatus('Detecting musical key...');
+                detectedKey = detectKey(audioBuffer);
+                setStatus(`BPM: ${bpm} | Key: ${detectedKey}. Chopping audio into ${selectedLoopSize}-bar loops...`, true);
+                
+                const loopDuration = (60 / bpm) * 4 * selectedLoopSize;
+                const numLoops = Math.floor(audioBuffer.duration / loopDuration);
+                loops = [];
+                
+                for (let i = 0; i < numLoops; i++) {
+                    const startTime = i * loopDuration;
+                    const endTime = Math.min((i + 1) * loopDuration, audioBuffer.duration);
+                    const duration = endTime - startTime;
+                    
+                    const loopBuffer = Tone.context.createBuffer(
+                        audioBuffer.numberOfChannels,
+                        Math.floor(duration * audioBuffer.sampleRate),
+                        audioBuffer.sampleRate
+                    );
+                    
+                    for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+                        const sourceData = audioBuffer.getChannelData(channel);
+                        const targetData = loopBuffer.getChannelData(channel);
+                        const startSample = Math.floor(startTime * audioBuffer.sampleRate);
+                        for (let j = 0; j < targetData.length; j++) {
+                            targetData[j] = sourceData[startSample + j] || 0;
+                        }
+                    }
+                    
+                    const loopName = `${fileName}_${bpm}bpm_${detectedKey}_${selectedLoopSize}bar_loop${String(i + 1).padStart(3, '0')}`;
+                    loops.push({
+                        id: i,
+                        name: loopName,
+                        buffer: loopBuffer,
+                        startTime: startTime.toFixed(2),
+                        duration: duration.toFixed(2)
+                    });
+                }
+                
+                displayLoops();
+                setStatus(`Success! Generated ${loops.length} loops of ${selectedLoopSize} bars each.`, true);
+            } catch (error) {
+                setStatus('Error: ' + error.message);
+            } finally {
+                document.getElementById('analyzeBtn').textContent = 'Analyze & Chop Audio';
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        }
+
+        function displayLoops() {
+            document.getElementById('loopsTitle').textContent = `Generated Loops (${loops.length})`;
+            document.getElementById('loopsContainer').classList.remove('hidden');
+            const container = document.getElementById('loopsList');
+            container.innerHTML = '';
+            
+            loops.forEach(loop => {
+                const div = document.createElement('div');
+                div.className = 'loop-item';
+                div.innerHTML = `
+                    <div class="loop-info">
+                        <div id="check-${loop.id}" class="checkmark">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="loop-name">${loop.name}</p>
+                            <p class="loop-details">Start: ${loop.startTime}s | Duration: ${loop.duration}s</p>
+                        </div>
+                    </div>
+                    <button onclick="downloadLoop(${loop.id})" id="btn-${loop.id}" class="btn-download purple">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Download
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function audioBufferToWav(buffer) {
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = 1;
+            const bitDepth = 16;
+            const bytesPerSample = bitDepth / 8;
+            const blockAlign = numChannels * bytesPerSample;
+            const data = [];
+            
+            for (let i = 0; i < buffer.length; i++) {
+                for (let channel = 0; channel < numChannels; channel++) {
+                    const sample = buffer.getChannelData(channel)[i];
+                    const intSample = Math.max(-1, Math.min(1, sample));
+                    data.push(intSample < 0 ? intSample * 0x8000 : intSample * 0x7FFF);
+                }
+            }
+            
+            const dataLength = data.length * bytesPerSample;
+            const arrayBuffer = new ArrayBuffer(44 + dataLength);
+            const view = new DataView(arrayBuffer);
+            
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + dataLength, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, format, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * blockAlign, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitDepth, true);
+            writeString(36, 'data');
+            view.setUint32(40, dataLength, true);
+            
+            let offset = 44;
+            for (let i = 0; i < data.length; i++) {
+                view.setInt16(offset, data[i], true);
+                offset += 2;
+            }
+            
+            return arrayBuffer;
+        }
+
+        function downloadLoop(loopId) {
+            const loop = loops.find(l => l.id === loopId);
+            if (!loop) return;
+            
+            try {
+                const wav = audioBufferToWav(loop.buffer);
+                const blob = new Blob([wav], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = loop.name + '.wav';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                
+                downloadedLoops.add(loopId);
+                document.getElementById('check-' + loopId).classList.add('visible');
+                const btn = document.getElementById('btn-' + loopId);
+                btn.className = 'btn-download green';
+                btn.innerHTML = `
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Downloaded
+                `;
+            } catch (error) {
+                setStatus('Download error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
